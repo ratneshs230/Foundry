@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Gemini AI Chat",
+  "version": "1.1",
+  "description": "Chat with Google's Gemini AI directly from your browser with file upload support",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://generativelanguage.googleapis.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Gemini AI Chat"
+  },
+  "options_page": "options.html",
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self';"
+  }
+}
