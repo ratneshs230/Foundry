@@ -64,13 +64,27 @@ export function ProjectModal({ isOpen, onClose, onSelectProject }: ProjectModalP
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Project Directory
             </label>
-            <input
-              type="text"
-              value={projectPath}
-              onChange={(e) => setProjectPath(e.target.value)}
-              placeholder={isNewProject ? "C:\\MyProjects\\NewApp" : "C:\\MyProjects\\ExistingApp"}
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
-            />
+            <div className="flex space-x-2">
+              <input
+                type="text"
+                value={projectPath}
+                onChange={(e) => setProjectPath(e.target.value)}
+                placeholder={isNewProject ? "C:\\MyProjects\\NewApp" : "C:\\MyProjects\\ExistingApp"}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+              />
+              <button
+                type="button"
+                className="px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
+                onClick={async () => {
+                  if (window.electronAPI) {
+                    const dir = await window.electronAPI.selectDirectory();
+                    if (dir) setProjectPath(dir);
+                  }
+                }}
+              >
+                Browse
+              </button>
+            </div>
           </div>
 
           {isNewProject && (

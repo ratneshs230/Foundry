@@ -5,6 +5,7 @@ import { ProjectModal } from './components/ProjectModal';
 import { FileExplorer } from './components/FileExplorer';
 import { CodeEditor } from './components/CodeEditor';
 import { AgentChat } from './components/AgentChat';
+import { AgentLogViewer } from './components/AgentLogViewer';
 import { useAgents } from './hooks/useAgents';
 import { FileNode, Project, UploadedFile } from './types';
 
@@ -47,53 +48,58 @@ function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showProject, setShowProject] = useState(false);
+  const [showLog, setShowLog] = useState(false);
   const [project, setProject] = useState<Project | null>(null);
   const [files, setFiles] = useState<FileNode[]>([]);
   const [selectedFile, setSelectedFile] = useState<FileNode | undefined>();
   
-  const { 
-    messages, 
-    agentStatus, 
+  const {
+    messages,
+    agentStatus,
     selectedModel,
     availableModels,
-    simulateAgentConversation, 
+    agentConversation,
     clearMessages,
-    changeModel
+    changeModel,
+    setApiKey,
+    setProjectDir
   } = useAgents();
 
   const handleConnect = (apiKey: string) => {
-    // Simulate API connection
+    setApiKey(apiKey);
     setIsConnected(true);
     setShowSettings(false);
   };
 
-  const handleSelectProject = (path: string, name: string) => {
-    setProject({ name, path, files: sampleProject });
-    setFiles(sampleProject);
+  const handleSelectProject = async (path: string, name: string) => {
+    setProject({ name, path, files: [] });
+    setProjectDir(path);
+    // List files from real file system recursively
+    if (window.electronAPI) {
+      const tree = await window.electronAPI.listDirRecursive(path);
+      // Assign unique IDs
+      const assignIds = (nodes: any[], parentId = ''): FileNode[] => nodes.map((n, i) => ({
+        ...n,
+        id: parentId + i,
+        children: n.children ? assignIds(n.children, parentId + i + '-') : undefined
+      }));
+      setFiles(assignIds(tree));
+    }
     setShowProject(false);
   };
 
-  const handleFileChange = (file: FileNode, content: string) => {
-    const updateFileContent = (nodes: FileNode[]): FileNode[] => {
-      return nodes.map(node => {
-        if (node.id === file.id) {
-          return { ...node, content };
-        }
-        if (node.children) {
-          return { ...node, children: updateFileContent(node.children) };
-        }
-        return node;
-      });
-    };
-
-    setFiles(updateFileContent(files));
+  const handleFileChange = async (file: FileNode, content: string) => {
+    if (window.electronAPI) {
+      await window.electronAPI.writeFile(file.path, content);
+    }
+    setFiles((prev: FileNode[]) => prev.map((f: FileNode) => f.id === file.id ? { ...f, content } : f));
     if (selectedFile?.id === file.id) {
       setSelectedFile({ ...selectedFile, content });
     }
   };
 
   const handleSendMessage = (content: string, attachments?: UploadedFile[]) => {
-    simulateAgentConversation(content, files, attachments);
+    agentConversation(content, attachments);
   };
 
   const handleNewChat = () => {
@@ -130,7 +136,7 @@ function App() {
             />
           </div>
           
-          <div className="w-96">
+          <div className="w-96 flex flex-col border-r border-gray-700">
             <AgentChat
               messages={messages}
               agentStatus={agentStatus}
@@ -141,6 +147,17 @@ function App() {
               availableModels={availableModels}
               onNewChat={handleNewChat}
             />
+            <button
+              className="w-full py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs font-semibold border-t border-gray-800"
+              onClick={() => setShowLog((v) => !v)}
+            >
+              {showLog ? 'Hide Agent Log' : 'Show Agent Log'}
+            </button>
+            {showLog && (
+              <div className="flex-1 min-h-0 max-h-80 border-t border-gray-800">
+                <AgentLogViewer />
+              </div>
+            )}
           </div>
         </div>
       </div>

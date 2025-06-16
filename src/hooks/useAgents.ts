@@ -1,129 +1,184 @@
 import { useState, useCallback } from 'react';
-import { Message, AgentStatus, FileNode, UploadedFile, GeminiModel } from '../types';
-
-const GEMINI_MODELS: GeminiModel[] = [
-  {
-    id: 'gemini-1.5-pro',
-    name: 'Gemini 1.5 Pro',
-    description: 'Most capable model for complex reasoning tasks',
-    maxTokens: 2097152
-  },
-  {
-    id: 'gemini-1.5-flash',
-    name: 'Gemini 1.5 Flash',
-    description: 'Fast and efficient for most tasks',
-    maxTokens: 1048576
-  },
-  {
-    id: 'gemini-1.0-pro',
-    name: 'Gemini 1.0 Pro',
-    description: 'Reliable performance for general tasks',
-    maxTokens: 32768
-  },
-  {
-    id: 'gemini-1.5-pro-exp',
-    name: 'Gemini 1.5 Pro Experimental',
-    description: 'Latest experimental features and improvements',
-    maxTokens: 2097152
-  }
-];
+import { Message, AgentStatus, FileNode, UploadedFile } from '../types';
 
 export function useAgents() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [agentStatus, setAgentStatus] = useState<AgentStatus>({
     supervisor: 'idle',
-    coder: 'idle'
+    coder: 'idle',
+    user: 'idle'
   });
-  const [selectedModel, setSelectedModel] = useState<GeminiModel>(GEMINI_MODELS[0]);
+  const [projectDir, setProjectDir] = useState<string>('');
 
-  const addMessage = useCallback((sender: Message['sender'], content: string, type: Message['type'] = 'text', attachments?: UploadedFile[]) => {
+  // Set ChatGPT API key via Electron IPC
+  const setApiKey = useCallback(async (key: string) => {
+    if (window.electronAPI) {
+      await window.electronAPI.setChatgptApiKey(key);
+    }
+  }, []);
+
+  // Add a message to the chat log and log via IPC
+  const addMessage = useCallback((sender: Message['sender'] | 'system', content: string, type: Message['type'] = 'text', attachments?: UploadedFile[]) => {
     const message: Message = {
       id: Math.random().toString(36).substr(2, 9),
-      sender,
+      sender: sender as Message['sender'],
       content,
       timestamp: new Date(),
       type,
       attachments
     };
-    setMessages(prev => [...prev, message]);
+    setMessages((prev: Message[]) => [...prev, message]);
+    if (window.electronAPI) {
+      window.electronAPI.agentMessage({ from: sender, to: 'all', message: content });
+    }
     return message;
   }, []);
 
-  const simulateAgentConversation = useCallback(async (userMessage: string, files: FileNode[], attachments?: UploadedFile[]) => {
-    // Add user message with attachments
-    addMessage('user', userMessage, 'text', attachments);
-
-    // Process attachments if any
-    let attachmentContext = '';
-    if (attachments && attachments.length > 0) {
-      attachmentContext = `\n\nAttached files: ${attachments.map(f => f.name).join(', ')}`;
-      
-      // Simulate processing attachments
-      await new Promise(resolve => setTimeout(resolve, 500));
-      addMessage('supervisor', `I can see you've attached ${attachments.length} file(s). Let me analyze them along with your request.`);
+  // Fetch agent logs from Electron
+  const fetchAgentLogs = useCallback(async () => {
+    if (window.electronAPI) {
+      return await window.electronAPI.getAgentLogs();
     }
-
-    // Supervisor responds first
-    setAgentStatus(prev => ({ ...prev, supervisor: 'active' }));
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    addMessage('supervisor', `I understand you want to ${userMessage.toLowerCase()}${attachmentContext}. Using ${selectedModel.name} for optimal performance. Let me analyze the requirements and coordinate with the Coder agent to implement this functionality.`);
-    
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    addMessage('supervisor', 'Coder, please implement the following requirements:\n1. Create the necessary file structure\n2. Implement the core functionality\n3. Add proper error handling\n4. Ensure code quality and documentation\n5. Consider the attached files in the implementation', 'system');
-    
-    setAgentStatus(prev => ({ ...prev, supervisor: 'idle', coder: 'active' }));
-    
-    // Coder responds
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    addMessage('coder', `Acknowledged, Supervisor. I'll start implementing the solution using ${selectedModel.name} capabilities. ${attachments ? `I've analyzed the ${attachments.length} attached file(s) and will incorporate them into the solution.` : ''}`);
-    
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    addMessage('coder', `// Implementation based on your request: ${userMessage}
-${attachments ? `// Incorporating attached files: ${attachments.map(f => f.name).join(', ')}\n` : ''}
-function implementFeature() {
-  // ${userMessage}
-  ${attachments ? '// Processing uploaded files...\n  ' : ''}console.log('Feature implemented successfully with ${selectedModel.name}');
-  return { 
-    success: true, 
-    message: 'Implementation complete',
-    model: '${selectedModel.name}',
-    attachments: ${attachments?.length || 0}
-  };
-}
-
-// Additional files and components would be created here
-export default implementFeature;`, 'code');
-    
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    addMessage('coder', `Implementation complete! I've created the necessary files and implemented the requested functionality using ${selectedModel.name}. ${attachments ? `The ${attachments.length} uploaded file(s) have been processed and integrated into the solution. ` : ''}The code is ready for review.`);
-    
-    setAgentStatus(prev => ({ ...prev, coder: 'idle', supervisor: 'active' }));
-    
-    // Supervisor reviews
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    addMessage('supervisor', `Excellent work, Coder! The implementation looks solid and makes good use of ${selectedModel.name}'s capabilities. I've reviewed the code and it meets all the requirements${attachments ? `, including proper handling of the uploaded files` : ''}. The feature is ready for deployment.`);
-    
-    setAgentStatus(prev => ({ ...prev, supervisor: 'idle' }));
-  }, [addMessage, selectedModel]);
-
-  const clearMessages = useCallback(() => {
-    setMessages([]);
-    setAgentStatus({ supervisor: 'idle', coder: 'idle' });
+    return [];
   }, []);
 
-  const changeModel = useCallback((model: GeminiModel) => {
-    setSelectedModel(model);
-    addMessage('system', `Switched to ${model.name} - ${model.description}`, 'system');
-  }, [addMessage]);
+  // Open folder picker and set project directory
+  const pickProjectDir = useCallback(async () => {
+    if (window.electronAPI) {
+      const dir = await window.electronAPI.selectDirectory();
+      if (dir) setProjectDir(dir);
+      return dir;
+    }
+    return null;
+  }, []);
+
+  // Real agent conversation using ChatGPT API and file system
+  const agentConversation = useCallback(async (userMessage: string, attachments?: UploadedFile[]) => {
+    setAgentStatus((prev: AgentStatus) => ({ ...prev, user: 'idle' }));
+    addMessage('user', userMessage, 'text', attachments);
+    if (!projectDir) {
+      addMessage('system', 'Please select a project directory before starting.', 'system');
+      return;
+    }
+    setAgentStatus((prev: AgentStatus) => ({ ...prev, supervisor: 'active', user: 'idle' }));
+    // Supervisor: Analyze requirements
+    const supervisorPrompt = `You are the Supervisor (Architect). The user wants: ${userMessage}\nDiscuss requirements, then instruct the Coder agent. Reply as Supervisor. The coder will work on real files in the project directory: ${projectDir}`;
+    let supervisorRes;
+    try {
+      supervisorRes = await window.electronAPI.chatgptRequestSession({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: 'You are the Supervisor (Architect).' },
+          { role: 'user', content: supervisorPrompt }
+        ],
+        max_tokens: 1024
+      });
+    } catch (err) {
+      addMessage('system', `Supervisor ChatGPT request error: ${err}`, 'system');
+      return;
+    }
+    const supervisorMsg = supervisorRes.choices?.[0]?.message?.content || 'Supervisor response.';
+    addMessage('supervisor', supervisorMsg);
+    // Log supervisor message
+    if (window.electronAPI) {
+      window.electronAPI.agentMessage({ from: 'supervisor', to: 'coder', message: supervisorMsg });
+    }
+    setAgentStatus((prev: AgentStatus) => ({ ...prev, supervisor: 'idle', coder: 'active', user: 'idle' }));
+    // Coder: Implement instructions
+    const coderPrompt = `You are the Coder (Engineer). Supervisor says: ${supervisorMsg}\nYou must generate and apply real file operations (create/modify/delete) in the project directory: ${projectDir}. Reply as Coder.\nFormat file operations as JSON: {\n  "operations": [\n    {"action": "create|modify|delete", "path": "relative/or/absolute/path", "content": "..."} ...\n  ]\n}`;
+    let coderRes;
+    try {
+      coderRes = await window.electronAPI.chatgptRequestSession({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: 'You are the Coder (Engineer).' },
+          { role: 'user', content: coderPrompt }
+        ],
+        max_tokens: 2048
+      });
+    } catch (err) {
+      addMessage('system', `Coder ChatGPT request error: ${err}`, 'system');
+      return;
+    }
+    const coderMsg = coderRes.choices?.[0]?.message?.content || 'Coder response.';
+    addMessage('coder', coderMsg, 'code');
+    // Log coder message
+    if (window.electronAPI) {
+      window.electronAPI.agentMessage({ from: 'coder', to: 'supervisor', message: coderMsg });
+    }
+    // Parse coderMsg for file operations and apply them using Electron file APIs
+    try {
+      // Remove Markdown code block markers if present
+      let jsonBlock = coderMsg.replace(/```json|```/gi, '').trim();
+      // Extract the first valid JSON object
+      const match = jsonBlock.match(/\{[\s\S]*\}/);
+      if (match) {
+        const ops = JSON.parse(match[0]);
+        if (Array.isArray(ops.operations)) {
+          for (const op of ops.operations) {
+            // Always resolve path relative to projectDir
+            const absPath = op.path.startsWith(projectDir) ? op.path : `${projectDir.replace(/\\$/, '')}/${op.path.replace(/^\\|\//, '')}`;
+            if (op.action === 'create') {
+              await window.electronAPI.createFile(absPath, op.content || '');
+            } else if (op.action === 'modify') {
+              await window.electronAPI.writeFile(absPath, op.content || '');
+            } else if (op.action === 'delete') {
+              await window.electronAPI.deleteFile(absPath);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      addMessage('system', `Failed to parse or apply file operations: ${e}`, 'system');
+    }
+    setAgentStatus((prev: AgentStatus) => ({ ...prev, coder: 'idle', supervisor: 'active', user: 'idle' }));
+    // Supervisor: Review
+    const reviewPrompt = `You are the Supervisor. Review the Coder's implementation: ${coderMsg}`;
+    let reviewRes;
+    try {
+      reviewRes = await window.electronAPI.chatgptRequestSession({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: 'You are the Supervisor.' },
+          { role: 'user', content: reviewPrompt }
+        ],
+        max_tokens: 1024
+      });
+    } catch (err) {
+      addMessage('system', `Supervisor review ChatGPT request error: ${err}`, 'system');
+      return;
+    }
+    const reviewMsg = reviewRes.choices?.[0]?.message?.content || 'Supervisor review.';
+    addMessage('supervisor', reviewMsg);
+    // If supervisor wants user input, set user status to active and ask a simple question
+    if (/user input|user response|ask the user|need clarification|please provide|can you/i.test(reviewMsg)) {
+      setAgentStatus((prev: AgentStatus) => ({ ...prev, supervisor: 'idle', user: 'active', coder: 'idle' }));
+      // Optionally, extract a simple question from the reviewMsg
+      const questionMatch = reviewMsg.match(/(?:question|ask|please provide|can you|clarify|input)[^\n\.!?]*[\n\.!?]/i);
+      if (questionMatch) {
+        addMessage('system', `Question for user: ${questionMatch[0].trim()}`, 'system');
+      } else {
+        addMessage('system', 'Supervisor needs your input. Please respond in simple words.', 'system');
+      }
+    } else {
+      setAgentStatus((prev: AgentStatus) => ({ ...prev, supervisor: 'idle', user: 'idle', coder: 'idle' }));
+    }
+    if (window.electronAPI) {
+      window.electronAPI.agentMessage({ from: 'supervisor', to: 'coder', message: reviewMsg });
+    }
+  }, [addMessage, projectDir]);
 
   return {
     messages,
     agentStatus,
-    selectedModel,
-    availableModels: GEMINI_MODELS,
-    simulateAgentConversation,
-    clearMessages,
-    changeModel
+    agentConversation,
+    clearMessages: useCallback(() => {
+      setMessages([]);
+      setAgentStatus({ supervisor: 'idle', coder: 'idle', user: 'idle' });
+    }, []),
+    setApiKey,
+    setProjectDir,
+    pickProjectDir,
+    fetchAgentLogs
   };
 }

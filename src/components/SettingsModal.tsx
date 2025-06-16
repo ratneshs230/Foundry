@@ -54,17 +54,17 @@ export function SettingsModal({ isOpen, onClose, onConnect, isConnected }: Setti
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
               <Key className="w-4 h-4 inline mr-1" />
-              Google Gemini API Key
+              OpenAI ChatGPT API Key
             </label>
             <input
               type="password"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              placeholder="Enter your Gemini API key..."
+              placeholder="Enter your OpenAI API key..."
               className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
             />
             <p className="text-xs text-gray-400 mt-1">
-              Your API key is stored securely and used only for Gemini API calls.
+              Your API key is stored securely and used only for OpenAI API calls.
             </p>
           </div>
 

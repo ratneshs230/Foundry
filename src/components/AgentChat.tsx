@@ -1,15 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Code, MessageSquare, Plus, Paperclip, X, Trash2, Settings } from 'lucide-react';
-import { Message, AgentStatus, UploadedFile, GeminiModel } from '../types';
+import { Message, AgentStatus, UploadedFile } from '../types';
 
 interface AgentChatProps {
   messages: Message[];
   agentStatus: AgentStatus;
   onSendMessage: (content: string, attachments?: UploadedFile[]) => void;
   isConnected: boolean;
-  selectedModel: GeminiModel;
-  onModelChange: (model: GeminiModel) => void;
-  availableModels: GeminiModel[];
   onNewChat: () => void;
 }
 
@@ -18,14 +15,10 @@ export function AgentChat({
   agentStatus, 
   onSendMessage, 
   isConnected, 
-  selectedModel,
-  onModelChange,
-  availableModels,
   onNewChat
 }: AgentChatProps) {
   const [input, setInput] = useState('');
   const [attachments, setAttachments] = useState<UploadedFile[]>([]);
-  const [showModelSelector, setShowModelSelector] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -123,39 +116,6 @@ export function AgentChat({
               <Plus className="w-3 h-3" />
               <span>New Chat</span>
             </button>
-            <div className="relative">
-              <button
-                onClick={() => setShowModelSelector(!showModelSelector)}
-                className="flex items-center space-x-1 px-2 py-1 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded text-xs transition-colors"
-              >
-                <Settings className="w-3 h-3" />
-                <span>{selectedModel.name}</span>
-              </button>
-              
-              {showModelSelector && (
-                <div className="absolute top-full right-0 mt-1 bg-gray-700 border border-gray-600 rounded-lg shadow-lg z-10 min-w-64">
-                  <div className="p-2">
-                    <div className="text-xs text-gray-400 mb-2">Select Gemini Model</div>
-                    {availableModels.map(model => (
-                      <button
-                        key={model.id}
-                        onClick={() => {
-                          onModelChange(model);
-                          setShowModelSelector(false);
-                        }}
-                        className={`w-full text-left p-2 rounded text-xs hover:bg-gray-600 transition-colors ${
-                          selectedModel.id === model.id ? 'bg-blue-900 text-blue-300' : 'text-gray-300'
-                        }`}
-                      >
-                        <div className="font-medium">{model.name}</div>
-                        <div className="text-gray-400 text-xs">{model.description}</div>
-                        <div className="text-gray-500 text-xs">Max tokens: {model.maxTokens.toLocaleString()}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
         </div>
         
@@ -175,6 +135,14 @@ export function AgentChat({
               agentStatus.coder === 'active' ? 'bg-green-400 animate-pulse' : 'bg-gray-500'
             }`} />
             <span>Coder</span>
+          </div>
+          <div className={`flex items-center space-x-1 ${
+            agentStatus.user === 'active' ? 'text-blue-400' : 'text-gray-500'
+          }`}>
+            <div className={`w-2 h-2 rounded-full ${
+              agentStatus.user === 'active' ? 'bg-blue-400 animate-pulse' : 'bg-gray-500'
+            }`} />
+            <span>User</span>
           </div>
         </div>
       </div>
@@ -252,7 +220,7 @@ export function AgentChat({
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={isConnected ? "Describe what you want to build..." : "Connect to Gemini API first"}
+              placeholder={isConnected ? "Describe what you want to build..." : "Connect to OpenAI API first"}
               disabled={!isConnected}
               className="w-full px-3 py-2 pr-10 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 disabled:opacity-50"
             />

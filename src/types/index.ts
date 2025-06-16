@@ -12,7 +12,7 @@ export interface Message {
   id: string;
   sender: 'user' | 'supervisor' | 'coder';
   content: string;
-  timestamp: Date;a
+  timestamp: Date;
   type: 'text' | 'code' | 'system';
   attachments?: UploadedFile[];
 }
@@ -20,6 +20,7 @@ export interface Message {
 export interface AgentStatus {
   supervisor: 'idle' | 'thinking' | 'active';
   coder: 'idle' | 'coding' | 'active';
+  user: 'idle' | 'active';
 }
 
 export interface Project {
@@ -37,9 +38,8 @@ export interface UploadedFile {
   url?: string;
 }
 
-export interface GeminiModel {
-  id: string;
-  name: string;
-  description: string;
-  maxTokens: number;
+export interface ElectronAPI {
+  setChatgptApiKey: (key: string) => Promise<boolean>;
+  getChatgptApiKey: () => Promise<string | null>;
+  chatgptRequestSession: (payload: any) => Promise<any>;
 }

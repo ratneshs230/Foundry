@@ -1,0 +1,20 @@
+{
+  "name": "ai-code-generator-electron",
+  "version": "1.0.0",
+  "main": "electron/main.js",
+  "description": "AI Code Generator with Electron backend for file system and Gemini API access.",
+  "scripts": {
+    "start": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "electron": "electron .",
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "electron": "^30.0.0",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "wait-on": "^7.0.1"
+  }
+}
